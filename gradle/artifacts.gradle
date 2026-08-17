@@ -11,9 +11,15 @@ if (project.plugins.hasPlugin('com.android.library')) {
             String androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
             classpath = variant.javaCompiler.classpath + files(androidJar)
 
-            // The Android online reference doesn't include package-list, so we have to use the local one
-            String packageListRef = "${android.sdkDirectory}/docs/reference/"
-            options.linksOffline 'http://d.android.com/reference/', packageListRef
+            // Modern Android SDKs may not include the legacy offline reference index.
+            File packageListRef = new File(android.sdkDirectory, 'docs/reference')
+            File elementList = new File(packageListRef, 'element-list')
+            File legacyPackageList = new File(packageListRef, 'package-list')
+            if (elementList.exists() || legacyPackageList.exists()) {
+                options.linksOffline 'http://d.android.com/reference/', packageListRef
+            } else {
+                logger.lifecycle("Skipping Android offline Javadoc link; no docs/reference index found in ${packageListRef}")
+            }
 
             // Additional links for any RxJava references
             options.links 'http://reactivex.io/RxJava/javadoc/'
@@ -26,11 +32,11 @@ if (project.plugins.hasPlugin('com.android.library')) {
             destinationDir = new File(project.docsDir, "javadoc-$variant.name")
         }
 
-        // For official releasese, don't prefix the name so the artifact is published correctly
+        // For official releases, don't prefix the name so the artifact is published correctly
         // (Can't seem to modify it for publishing, for whatever reason...)
         String classifierPrefix = (variant.name == 'release') ? '' : "$variant.name-"
 
-        Task javadocJarTask = task("generate${variant.name.capitalize()}JavadocJar", type: Jar, dependsOn: javadocTask) {
+        Jar javadocJarTask = task("generate${variant.name.capitalize()}JavadocJar", type: Jar, dependsOn: javadocTask) {
             group = 'artifact'
             description = "Generates Javadoc jar for $variant.name"
 
@@ -38,7 +44,7 @@ if (project.plugins.hasPlugin('com.android.library')) {
             from javadocTask.destinationDir
         }
 
-        Task sourcesJarTask = task("generate${variant.name.capitalize()}SourcesJar", type: Jar) {
+        Jar sourcesJarTask = task("generate${variant.name.capitalize()}SourcesJar", type: Jar) {
             group = 'artifact'
             description = "Generates sources jar for $variant.name"
 
@@ -47,13 +53,12 @@ if (project.plugins.hasPlugin('com.android.library')) {
         }
 
         if (variant.name == 'release') {
-            // There's a lot of "magic" around the archives configuration; easier 
+            // There's a lot of 'magic' around the archives configuration; easier
             // just to embrace it rather than try to configure around it
             artifacts {
                 archives javadocJarTask, sourcesJarTask
             }
-        }
-        else {
+        } else {
             // Create a configuration we can publish from for each variant
             String configurationName = "archives${variant.name.capitalize()}"
             configurations.create(configurationName)
