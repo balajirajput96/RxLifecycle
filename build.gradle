@@ -23,7 +23,25 @@ subprojects {
     version = VERSION_NAME
 }
 
+// Robolectric 3.8 instruments legacy Android classes that can fail JVM
+// verification on current runners. Keep the workaround scoped to Android
+// library unit tests.
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('com.android.library')) {
+            project.android {
+                testOptions {
+                    unitTests.all {
+                        jvmArgs '-noverify'
+                    }
+                }
+            }
+        }
+    }
+}
+
 apply plugin: 'com.github.ben-manes.versions'
+
 
 ext {
     minSdkVersion = 14
